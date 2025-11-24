@@ -1,44 +1,44 @@
-# 03-gpt-oss-20b lmstudio 本地部署调用
+# 03-gpt-oss-20b lmstudio Local Deployment & Call
 
-## 引言
+## Introduction
 
-> 看完本教程你将收获：
+> After reading this tutorial, you will learn:
 > 
-> - 通过lmstudio部署gpt-oss-20b并应用MCP
+> - How to deploy gpt-oss-20b via lmstudio and apply MCP
 > 	
 
-在本地运行大型语言模型（LLMs）已成为许多开发者和爱好者的热门选择，它提供了隐私性、定制化和离线使用的可能性。虽然像 Ollama 这样的工具提供了强大的命令行界面来管理和运行本地模型，但 LM Studio 则为寻求更图形化、更直观交互体验的用户提供了一个极具吸引力的替代方案。
-相比于 Ollama，LM Studio 拥有更加丰富的用户界面，同样强大的模型生态系统支持，以及更易于上手的交互体验。其突出的优势之一在于它非常适合在无网络环境下部署和使用大模型，使其成为一个出色的本地 LLM 应用产品。
-本教程将带您一步步了解如何开始使用 LM Studio。我们将涵盖：
+Running Large Language Models (LLMs) locally has become a popular choice for many developers and enthusiasts, offering privacy, customization, and offline usage possibilities. While tools like Ollama provide a powerful command-line interface for managing and running local models, LM Studio offers an attractive alternative for users seeking a more graphical, intuitive interaction experience.
+Compared to Ollama, LM Studio has a richer user interface, equally strong model ecosystem support, and an easier-to-use interaction experience. One of its outstanding advantages is that it is very suitable for deploying and using large models in offline environments, making it an excellent local LLM application product.
+This tutorial will take you step-by-step through how to start using LM Studio. We will cover:
 
-1. 下载与安装：快速获取并安装 LM Studio 应用程序。
+1. Download and Installation: Quickly get and install the LM Studio application.
 	
-2. 模型下载（在线）：学习如何在 LM Studio 界面内搜索、选择（根据硬件推荐）并下载模型，以 **gpt-oss-20b** 为例。
+2. Model Download (Online): Learn how to search, select (based on hardware recommendations), and download models within the LM Studio interface, using **gpt-oss-20b** as an example.
 	
-3. 模型安装（离线）：针对网络不佳或希望手动管理模型文件的用户，展示如何从魔搭社区等来源下载模型文件，并将其正确放置到 LM Studio 的模型库中。
+3. Model Installation (Offline): For users with poor network connections or those who wish to manually manage model files, show how to download model files from sources like ModelScope and place them correctly in LM Studio's model library.
 	
-4. 模型测试：通过 LM Studio 内建的聊天界面与下载好的 gpt-oss-20b 模型进行交互。
+4. Model Testing: Interact with the downloaded gpt-oss-20b model through LM Studio's built-in chat interface.
 	
-5. 本地 API 调用：设置 LM Studio 的本地服务器，并使用 Python 和 OpenAI 库通过 API 调用已加载的 **gpt-oss-20b**模型，实现程序化交互。
+5. Local API Call: Set up LM Studio's local server and use Python and OpenAI libraries to call the loaded **gpt-oss-20b** model via API for programmatic interaction.
 	
-6. 如何调用MCP让模型大展身手！
+6. How to call MCP to let the model show its skills!
 	
 
-无论您是想探索本地 LLM 的新手，还是在寻找一个界面友好、支持离线运行的工具，本指南都将帮助您轻松上手 LM Studio，并成功部署和调用 **gpt-oss-20b** 这样强大的模型。让我们开始吧！
+Whether you are a novice wanting to explore local LLMs or looking for a user-friendly tool that supports offline operation, this guide will help you easily get started with LM Studio and successfully deploy and call powerful models like **gpt-oss-20b**. Let's get started!
 
-## 安装Imstudio
+## Install LM Studio
 
-安装 LM Studio LM Studio 适用于 Windows、macOS 和 Linux。 [在这里获取。](https://lmstudio.ai/download)
+Install LM Studio. LM Studio is available for Windows, macOS, and Linux. [Get it here.](https://lmstudio.ai/download)
 
-> 选择适合你的系统进行下载～
+> Choose the version suitable for your system to download~
 
 ![](./images/3-0.png)
 
-## 模型下载
+## Model Download
 
-在 LM Studio 中加载模型 → 打开 LM Studio，使用模型加载界面加载下载的 gpt-oss 模型。
+Load model in LM Studio → Open LM Studio, use the model loading interface to load the downloaded gpt-oss model.
 ![](./images/3-1.png)
-或者，您可以使用命令行（苹果用户是终端）运行：
+Alternatively, you can run using the command line (Terminal for Apple users):
 
 ```Bash
 # For 20B
@@ -47,19 +47,19 @@ lms get openai/gpt-oss-20b
 lms get openai/gpt-oss-120b
 ```
 
-## 运行模型
+## Run Model
 
-> 使用模型 →加载后，您可以直接在 LM Studio 的聊天界面或通过 API 与模型进行交互。
+> Use Model → After loading, you can interact with the model directly in LM Studio's chat interface or via API.
 
 ![](./images/3-2.png)
 
-## 在终端 or lmstudio页面与gpt-oss聊天
+## Chat with gpt-oss in Terminal or LM Studio Page
 
 ```Bash
-lms chat openai/gpt-oss-20b #注意第一次运行之后才能使用lmx命令
+lms chat openai/gpt-oss-20b # Note: lms command can only be used after running for the first time
 ```
 
-## 在python脚本中调用本地部署的gpt-oss
+## Call Locally Deployed gpt-oss in Python Script
 
 ![](./images/3-3.png)
 
@@ -82,16 +82,16 @@ result = client.chat.completions.create(
 print(result.choices[0].message.content)
 ```
 
-## 如何应用MCP
+## How to Apply MCP
 
-> LM Studio 是一个 [MCP 客户端](https://lmstudio.ai/docs/app/plugins/mcp)，这意味着您可以将 MCP 服务器连接，允许我们为 gpt-oss 模型提供外部工具。
+> LM Studio is an [MCP Client](https://lmstudio.ai/docs/app/plugins/mcp), which means you can connect MCP servers, allowing us to provide external tools for the gpt-oss model.
 
-1. 查看mcp路径
+1. Check mcp path
 	
 
 `~/.lmstudio/mcp.json`
-LM Studio 的 SDK 有 ++[Python](https://github.com/lmstudio-ai/lmstudio-python)++ 和 ++[TypeScript](https://github.com/lmstudio-ai/lmstudio-js)++ 版本。您可以利用 SDK 实现工具调用和本地函数执行 gpt-oss。实现此目的的方法是通过 `.act（）` 调用，它允许您向 gpt-oss 提供工具，并让它在调用工具和推理之间切换，直到它完成您的任务。
-下面的示例显示了如何为模型提供能够在本地文件系统上创建文件的单个工具。您可以使用此示例作为起点，并使用更多工具对其进行扩展。请参阅有关 ++[Python](https://lmstudio.ai/docs/python/agent/tools)++ 和 ++[TypeScript](https://lmstudio.ai/docs/typescript/agent/tools)++ 的工具定义的文档。
+LM Studio's SDK has ++[Python](https://github.com/lmstudio-ai/lmstudio-python)++ and ++[TypeScript](https://github.com/lmstudio-ai/lmstudio-js)++ versions. You can use the SDK to implement tool calling and local function execution for gpt-oss. The way to achieve this is via the `.act()` call, which allows you to provide tools to gpt-oss and let it switch between calling tools and reasoning until it completes your task.
+The example below shows how to provide a single tool for the model capable of creating files on the local file system. You can use this example as a starting point and extend it with more tools. Please refer to the documentation on tool definitions for ++[Python](https://lmstudio.ai/docs/python/agent/tools)++ and ++[TypeScript](https://lmstudio.ai/docs/typescript/agent/tools)++.
 
 ```Bash
 uv pip install lmstudio
@@ -101,72 +101,72 @@ uv pip install lmstudio
 pip install lmstudio
 ```
 
-2. 在python脚本中使用
+2. Use in Python script
 	
 
 ```Python
-import readline  # 启用输入行编辑功能，支持历史记录和快捷键
+import readline  # Enable input line editing features, supporting history and shortcuts
 from pathlib import Path
  
 import lmstudio as lms
  
-# 定义一个可以被模型调用的工具函数，让AI助手能够创建文件
-# 工具函数本质上就是普通的Python函数，可以实现任何功能
+# Define a tool function that can be called by the model, allowing the AI assistant to create files
+# Tool functions are essentially ordinary Python functions that can implement any functionality
 def create_file(name: str, content: str):
-    """创建指定名称和内容的文件。
+    """Create a file with the specified name and content.
     
     Args:
-        name: 文件名（支持相对路径和绝对路径）
-        content: 文件内容
+        name: Filename (supports relative and absolute paths)
+        content: File content
         
     Returns:
-        操作结果的描述信息
+        Description of the operation result
     """
     dest_path = Path(name)
     if dest_path.exists():
-        return "错误：文件已存在，无法覆盖。"
+        return "Error: File already exists, cannot overwrite."
     try:
         dest_path.write_text(content, encoding="utf-8")
     except Exception as exc:
-        return f"错误：文件创建失败 - {exc!r}"
-    return f"文件 '{name}' 创建成功。"
+        return f"Error: File creation failed - {exc!r}"
+    return f"File '{name}' created successfully."
  
 def print_fragment(fragment, round_index=0):
-    """实时打印模型生成的文本片段，实现流式输出效果。
+    """Print model generated text fragments in real-time, achieving streaming output effect.
     
     Args:
-        fragment: 包含生成内容的片段对象
-        round_index: 轮次索引（.act()方法会自动传递此参数）
+        fragment: Fragment object containing generated content
+        round_index: Round index (.act() method will automatically pass this parameter)
         
     Note:
-        设置默认参数使得此回调函数同时兼容 .complete() 和 .respond() 方法
+        Setting default parameters makes this callback function compatible with both .complete() and .respond() methods
     """
     print(fragment.content, end="", flush=True)
  
-# 初始化模型和聊天会话
-model = lms.llm("openai/gpt-oss-20b")  # 加载OpenAI GPT-OSS 20B模型
-chat = lms.Chat("你是一个运行在用户计算机上的智能助手，可以帮助用户完成各种任务。")
+# Initialize model and chat session
+model = lms.llm("openai/gpt-oss-20b")  # Load OpenAI GPT-OSS 20B model
+chat = lms.Chat("You are an intelligent assistant running on the user's computer, capable of helping users complete various tasks.")
  
-# 主交互循环
+# Main interaction loop
 while True:
     try:
-        user_input = input("用户（直接回车退出）: ")
-    except EOFError:  # 处理Ctrl+D等终端输入结束信号
+        user_input = input("User (Press Enter directly to exit): ")
+    except EOFError:  # Handle terminal input end signals like Ctrl+D
         print()
         break
-    if not user_input.strip():  # 用户输入为空时退出程序
+    if not user_input.strip():  # Exit program when user input is empty
         break
     
-    # 将用户消息添加到聊天历史
+    # Add user message to chat history
     chat.add_user_message(user_input)
-    print("助手: ", end="", flush=True)
+    print("Assistant: ", end="", flush=True)
     
-    # 调用模型进行推理，支持工具调用和流式输出
+    # Call model for inference, supporting tool calling and streaming output
     model.act(
-        chat,                           # 聊天上下文
-        [create_file],                  # 可用的工具函数列表
-        on_message=chat.append,         # 将完整响应添加到聊天历史
-        on_prediction_fragment=print_fragment,  # 流式输出回调
+        chat,                           # Chat context
+        [create_file],                  # List of available tool functions
+        on_message=chat.append,         # Add complete response to chat history
+        on_prediction_fragment=print_fragment,  # Streaming output callback
     )
-    print()  # 换行分隔每轮对话
+    print()  # Newline separates each round of dialogue
 ```

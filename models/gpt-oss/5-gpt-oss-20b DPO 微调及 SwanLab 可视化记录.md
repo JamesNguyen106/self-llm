@@ -1,16 +1,16 @@
-# 05-gpt-oss-20b DPO微调以及Swanlab可视化
+# 05-gpt-oss-20b DPO Fine-tuning and SwanLab Visualization
 
-## 引言
+## Introduction
 
-> 看完本教程你将收获，构造DPO数据，利用ms-swift对gpt-oss-20b进行微调！
+> After reading this tutorial, you will learn how to construct DPO data and use ms-swift to fine-tune gpt-oss-20b!
 
-## 为什么要做DPO？
+## Why do DPO?
 
-在大模型微调中，通常先做 SFT（有监督微调）再做 DPO（直接偏好优化），因为 SFT 用高质量标注数据让模型先学会任务的基本能力和输出格式，而 DPO 用成对的优劣答案引导模型更符合人类偏好。若直接做 DPO，模型可能还不会生成合格答案，偏好信号噪声大，难以收敛；先 SFT 再 DPO 则能在“会做”的基础上优化到“做得好”。
+In large model fine-tuning, SFT (Supervised Fine-Tuning) is usually done first, followed by DPO (Direct Preference Optimization). This is because SFT uses high-quality labeled data to let the model learn the basic capabilities and output format of the task first, while DPO uses paired good and bad answers to guide the model to better align with human preferences. If DPO is done directly, the model may not be able to generate qualified answers yet, the preference signal noise is large, and it is difficult to converge; SFT followed by DPO can optimize to "do well" on the basis of "knowing how to do".
 
-## 环境配置
+## Environment Configuration
 
-1. 基础环境配置
+1. Basic Environment Configuration
 	
 
 > PyTorch 2.6.0
@@ -21,7 +21,7 @@
 > 
 > GPU NVIDIA H20-96GB \* 4
 
-2. Lora环境配置
+2. LoRA Environment Configuration
 	
 
 ```Bash
@@ -31,22 +31,22 @@ pip install swanlab
 pip install -U transformers kernels torch
 ```
 
-## 数据准备
+## Data Preparation
 
-> 构建数据集，示例数据如下
+> Build dataset, example data is as follows
 > 
-> 参考[自定义数据集 — swift 3.8.0.dev0 文档](https://swift.readthedocs.io/zh-cn/latest/Customization/%E8%87%AA%E5%AE%9A%E4%B9%89%E6%95%B0%E6%8D%AE%E9%9B%86.html)获得更多定义方式
+> Refer to [Custom Dataset — swift 3.8.0.dev0 Documentation](https://swift.readthedocs.io/zh-cn/latest/Customization/%E8%87%AA%E5%AE%9A%E4%B9%89%E6%95%B0%E6%8D%AE%E9%9B%86.html) for more definition methods
 > 
-> 这里使用最简单，与官方结构一致的方式
+> Here uses the simplest way consistent with the official structure
 > 
-> 示例数据如下【结构中应包含一个正样本一个负样本】：
+> Example data is as follows [Structure should contain one positive sample and one negative sample]:
 
 ```JSON
-{"messages": [{"role": "system", "content": "你是个有用无害的助手"}, {"role": "user", "content": "告诉我明天的天气"}, {"role": "assistant", "content": "明天天气晴朗"}], "rejected_response": "我不知道"}
-{"messages": [{"role": "system", "content": "你是个有用无害的数学计算器"}, {"role": "user", "content": "1+1等于几"}, {"role": "assistant", "content": "等于2"}, {"role": "user", "content": "再加1呢"}, {"role": "assistant", "content": "等于3"}], "rejected_response": "我不知道"}
+{"messages": [{"role": "system", "content": "You are a helpful and harmless assistant"}, {"role": "user", "content": "Tell me tomorrow's weather"}, {"role": "assistant", "content": "Tomorrow will be sunny"}], "rejected_response": "I don't know"}
+{"messages": [{"role": "system", "content": "You are a helpful and harmless math calculator"}, {"role": "user", "content": "What is 1+1"}, {"role": "assistant", "content": "Equals 2"}, {"role": "user", "content": "Add 1 more"}, {"role": "assistant", "content": "Equals 3"}], "rejected_response": "I don't know"}
 ```
 
-在翻译任务上的数据：
+Data on translation task:
 
 ```JSON
     {
@@ -58,9 +58,9 @@ pip install -U transformers kernels torch
     }
 ```
 
-## 微调
+## Fine-tuning
 
-> 构造dpo脚本
+> Construct DPO script
 
 ```Bash
 MASTER_PORT=$PORT \
@@ -68,8 +68,8 @@ NPROC_PER_NODE=4 \
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
 swift rlhf --rlhf_type dpo \
     --deepspeed zero3 \
-    --model models/gpt-oss-20b \ #替换成你自己的模型路径
-    --dataset  dpo_data.json \ #替换成你自己的数据路径
+    --model models/gpt-oss-20b \ # Replace with your own model path
+    --dataset  dpo_data.json \ # Replace with your own data path
     --train_type lora \
     --torch_dtype bfloat16 \
     --num_train_epochs 1 \
@@ -93,36 +93,36 @@ swift rlhf --rlhf_type dpo \
     --save_strategy epoch\
     --model_author gxb \
     --model_name gxb-gpt-oss-20b-dpo \
-    --report_to swanlab \ #使用swanlab记录实验
+    --report_to swanlab \ # Use swanlab to record experiments
     --swanlab_project swift-robot
 ```
 
-> 训练过程可视化
+> Training process visualization
 
 ![](./images/5-0.png)
 
-> 显存占用情况
+> Video memory usage
 
 ![](./images/5-1.png)
 
-### Swanlab
+### SwanLab
 
 ![](./images/5-2.png)
 
-> [SwanLab](https://github.com/swanhubx/swanlab) 是一个开源的模型训练记录工具，面向 AI 研究者，提供了训练可视化、自动日志记录、超参数记录、实验对比、多人协同等功能。在 `SwanLab` 上，研究者能基于直观的可视化图表发现训练问题，对比多个实验找到研究灵感，并通过在线链接的分享与基于组织的多人协同训练，打破团队沟通的壁垒。
+> [SwanLab](https://github.com/swanhubx/swanlab) is an open-source model training recording tool for AI researchers, providing training visualization, automatic logging, hyperparameter recording, experiment comparison, multi-person collaboration, and other functions. On `SwanLab`, researchers can discover training problems based on intuitive visualization charts, compare multiple experiments to find research inspiration, and break down team communication barriers through online link sharing and organization-based multi-person collaborative training.
 
-#### 为什么要记录训练？
+#### Why record training?
 
-相较于软件开发，模型训练更像一个实验科学。一个品质优秀的模型背后，往往是成千上万次实验。研究者需要不断尝试、记录、对比，积累经验，才能找到最佳的模型结构、超参数与数据配比。在这之中，如何高效进行记录与对比，对于研究效率的提升至关重要。
+Compared to software development, model training is more like an experimental science. Behind a high-quality model are often thousands of experiments. Researchers need to constantly try, record, compare, and accumulate experience to find the best model structure, hyperparameters, and data ratio. In this process, how to efficiently record and compare is crucial for improving research efficiency.
 
-#### 在哪里用？
+#### Where to use?
 
-建议先在 [SwanLab 官网](https://swanlab.cn/) 注册账号，然后在SFT和GRPO训练初始化阶段选择
-`--report_to swanlab \ # 训练日志上报到 SwanLab`
+It is recommended to register an account on the [SwanLab official website](https://swanlab.cn/) first, and then select during the initialization phase of SFT and GRPO training
+`--report_to swanlab \ # Report training logs to SwanLab`
 
-### 合并权重
+### Merge Weights
 
-> 后续步骤与SFT保持一致
+> Subsequent steps are consistent with SFT
 
 ```Bash
 swift export \
@@ -130,9 +130,9 @@ swift export \
     --merge_lora true
 ```
 
-### 推理
+### Inference
 
-> 编写推理脚本
+> Write inference script
 
 ```Bash
 CUDA_VISIBLE_DEVICES=0 \

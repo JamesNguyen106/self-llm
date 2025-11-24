@@ -1,55 +1,56 @@
-# **01-GPT-OSS-20b** **vLLM** **部署调用**
+# **01-GPT-OSS-20b** **vLLM** **Deployment & Inference**
 
-## 引言
+## Introduction
 
-> 看完本教程你将收获：
+> After reading this tutorial, you will learn:
 > 
-> - 通过transformer在本地部署调用gpt-oss的能力！
+> - How to deploy and invoke gpt-oss capabilities locally using transformers!
 > 	
-> - 使用vLLM部署调用gpt-oss的能力！
+> - How to deploy and invoke gpt-oss capabilities using vLLM!
 > 	
 
-GPT-OSS 是 OpenAI 推出的开源大语言模型系列，包含两个版本：gpt-oss-120b 和 gpt-oss-20b。这两个模型均采用 MoE（Mixture-of-Experts）Transformer 架构，支持 128K 的上下文长度，并采用 Apache 2.0 许可协议，允许自由使用和商业应用。GPT-OSS-120B 模型在核心推理基准测试中与 OpenAI o4-mini 模型几乎持平，同时能在单个 80GB GPU 上高效运行。GPT-OSS-20B 模型在常见基准测试中与 OpenAI o3‑mini 模型取得类似结果，且可在仅配备 16GB 内存的边缘设备上运行，使其成为设备端应用、本地推理或无需昂贵基础设施的快速迭代的理想选择。这两个模型在工具使用、少样本函数调用、CoT推理（如在 Tau-Bench 智能体评估套件中的结果所示）以及 HealthBench 测试中表现强劲（甚至超越了 OpenAI o1 和 GPT‑4o 等专有模型）。
-vLLM 支持以下两种规模的gpt-oss:
+GPT-OSS is an open-source large language model series released by OpenAI, containing two versions: gpt-oss-120b and gpt-oss-20b. Both models adopt the MoE (Mixture-of-Experts) Transformer architecture, support a context length of 128K, and use the Apache 2.0 license, allowing free use and commercial applications. The GPT-OSS-120B model is almost on par with the OpenAI o4-mini model in core reasoning benchmarks, while being able to run efficiently on a single 80GB GPU. The GPT-OSS-20B model achieves similar results to the OpenAI o3-mini model in common benchmarks and can run on edge devices equipped with only 16GB of memory, making it ideal for on-device applications, local inference, or rapid iteration without expensive infrastructure. Both models perform strongly in tool use, few-shot function calling, CoT reasoning (as shown in results in the Tau-Bench agent evaluation suite), and HealthBench tests (even surpassing proprietary models such as OpenAI o1 and GPT-4o).
+
+vLLM supports the following two sizes of gpt-oss:
 
 - [openai/gpt-oss-20b](https://huggingface.co/openai/gpt-oss-20b)
-	- 较小的模型
+	- Smaller model
 		
-	- 仅需约 16GB 显存
+	- Requires only about 16GB VRAM
 		
-	- 可在消费级显卡如A100或H20上运行
+	- Can run on consumer-grade graphics cards such as A100 or H20
 		
 - [openai/gpt-oss-120b](https://huggingface.co/openai/gpt-oss-120b)
-	- 更大的全尺寸模型
+	- Larger full-size model
 		
-	- 显存≥60GB时效果最佳
+	- Best performance with VRAM ≥ 60GB
 		
-	- 可在单张H100或多GPU设置上运行
+	- Can run on single H100 or multi-GPU setups
 		
 
-## **环境准备**
+## **Environment Preparation**
 
-配置环境比较头疼，我们为同学们准备了镜像：
-- ⚠️**注意**：由于支持gpt-oss模型的vLLM 0.10.1版本还未正式发布（2025.8.6），需要从源码安装vLLM和gpt-oss的依赖。推荐启动一个新的python 3.12环境，避免对现有环境造成影响。
-- ⚠️**注意：** vllm-gpt-oss的很多依赖均为最新，如果不是最新配置环境会出问题！！！ 如需升级conda，升级cuda命令
+Configuring the environment can be a headache, so we have prepared a mirror for students:
+- ⚠️**Note**: Since vLLM version 0.10.1, which supports the gpt-oss model, has not been officially released yet (2025.8.6), you need to install vLLM and gpt-oss dependencies from source. It is recommended to start a new python 3.12 environment to avoid affecting the existing environment.
+- ⚠️**Note:** Many dependencies of vllm-gpt-oss are the latest. If the environment is not configured with the latest versions, problems will occur!!! If you need to upgrade conda, use the upgrade cuda command:
 
 ```Bash
 conda search cuda-toolkit --channel nvidia
-conda install cuda-toolkit=<新版本号> --channel nvidia
-nvcc --version #查看是否升级成功
+conda install cuda-toolkit=<new_version_number> --channel nvidia
+nvcc --version # Check if upgrade is successful
 
 export CUDA_HOME=$CONDA_PREFIX 
-export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH #在conda升级后需设置一下路径
+export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH # Set path after conda upgrade
 ```
 
-本文的试验基础环境如下：
+The experimental basic environment for this article is as follows:
 
 > PyTorch 2.9.0
 > Python 3.12(ubuntu22.04)
 > CUDA 12.8
 > GPU NVIDIA H20-96GB \* 1
 
-1. 克隆代码仓
+1. Clone the code repository
 	
 
 ```Bash
@@ -57,7 +58,7 @@ git clone https://github.com/huggingface/gpt-oss-recipes.git
 cd gpt-oss-recipes
 ```
 
-2. `pip`换源加速，下载并安装依赖包
+2. Change `pip` source for acceleration, download and install dependency packages
 	
 
 ```Bash
@@ -71,16 +72,16 @@ export HF_ENDPOINT="https://hf-mirror.com"
 pip install -U huggingface_hub
 ```
 
-3. `gpt-oss`依赖
+3. `gpt-oss` dependencies
 	
 
 ```Python
 pip install -U transformers kernels torch accelerate
 ```
 
-## **模型下载**
+## **Model Download**
 
-模型可以从Hugging Face和ModelScope仓库获取。可以显式下载，也可以在首次使用时执行仓库代码自动下载。
+Models can be obtained from Hugging Face and ModelScope repositories. You can download explicitly, or execute repository code to download automatically upon first use.
 
 ### **Hugging Face** **CLI**
 
@@ -88,13 +89,13 @@ pip install -U transformers kernels torch accelerate
 huggingface-cli download openai/gpt-oss-20b --local-dir gpt-oss-20b
 ```
 
-ps：记得修改对应的 `cache_dir` / `local_dir`为你的模型下载路径哦~
+ps: Remember to modify the corresponding `cache_dir` / `local_dir` to your model download path~
 
-## **transformers** **调用方式**
+## **transformers** **Usage**
 
-### 通过脚本调用
+### Call via Script
 
-使用`transformers`库作为推理的改写交互脚本进行调用测试
+Use the `transformers` library as a rewritten interaction script for inference to perform call testing
 
 ```Python
 from transformers import pipeline
@@ -122,58 +123,58 @@ print(outputs[0]["generated_text"][-1])
 
 ![](./images/1-0.png)
 
-### 通过服务调用
+### Call via Service
 
 ```Bash
 transformers serve
 transformers chat localhost:8000 --model-name-or-path openai/gpt-oss-20b
 ```
 
-ps：记得修改为你的模型下载路径哦~
+ps: Remember to modify to your model download path~
 ![](./images/1-1.png)
 
-### 调整生成参数
+### Adjust Generation Parameters
 
-可以通过系统提示调整推理的详细程度。例如，设置高推理级别：
+You can adjust the detail level of inference through system prompts. For example, set high reasoning level:
 
 ```JSON
 messages = [
     {"role": "system", "content": "Reasoning: high"},
-    {"role": "user", "content": "解释量子计算的基本原理"}
+    {"role": "user", "content": "Explain the basic principles of quantum computing"}
 ]
 ```
 
-## **vLLM** **调用代码准备**
+## **vLLM** **Call Code Preparation**
 
-### vLLM环境配置
+### vLLM Environment Configuration
 
-注意：vLLM版本之间兼容性很差，注意识别
+Note: Compatibility between vLLM versions is poor, please identify carefully
 
 ```Bash
 pip install --pre vllm==0.10.1+gptoss \
     --extra-index-url https://wheels.vllm.ai/gpt-oss/ \
     --extra-index-url https://download.pytorch.org/whl/nightly/cu128
  
-# !!!安装 FlashInfer!!!
+# !!!Install FlashInfer!!!
 pip install flashinfer-python==0.2.10
 ```
 
-### 启动服务器并下载模型
+### Start Server and Download Model
 
-vLLM 提供了一个命令，该命令将自动从 HuggingFace 下载模型并在 上启动与 OpenAI 兼容的服务器。
-根据服务器上的终端会话中所需的模型大小运行以下命令。
+vLLM provides a command that will automatically download the model from HuggingFace and start an OpenAI-compatible server on it.
+Run the following command based on the required model size in the terminal session on the server.
 
 ```Bash
-# For 20B 可以替换成本地下载的目录
+# For 20B, can be replaced with locally downloaded directory
 vllm serve openai/gpt-oss-20b
  
-# For 120B 可以替换成本地下载的目录
+# For 120B, can be replaced with locally downloaded directory
 vllm serve openai/gpt-oss-120b
 ```
 
 ![](./images/1-2.png)
 
-### 测试
+### Test
 
 ```Python
 VLLM_ATTENTION_BACKEND=TRITON_ATTN_VLLM_V1 vllm serve openai/gpt-oss-20b --served-model-name gpt-oss-20b --trust_remote_code --port 8801
@@ -181,10 +182,10 @@ VLLM_ATTENTION_BACKEND=TRITON_ATTN_VLLM_V1 vllm serve openai/gpt-oss-20b --serve
 
 ![](./images/1-3.png)
 
-### 参考链接
+### Reference Links
 
-- 在线体验网址：[https://gpt-oss.com/](https://gpt-oss.com/?utm_source=aihub.cn)
+- Online experience URL: [https://gpt-oss.com/](https://gpt-oss.com/?utm_source=aihub.cn)
 	
-- Huggingface：[https://huggingface.co/openai/gpt-oss-120b](https://huggingface.co/openai/gpt-oss-120b/?utm_source=aihub.cn)
+- Huggingface: [https://huggingface.co/openai/gpt-oss-120b](https://huggingface.co/openai/gpt-oss-120b/?utm_source=aihub.cn)
 	
-- vLLM官方gpt-oss文档：https://docs.vllm.ai/projects/recipes/en/latest/OpenAI/GPT-OSS.html#gpt-oss-vllm-usage-guide
+- vLLM official gpt-oss documentation: https://docs.vllm.ai/projects/recipes/en/latest/OpenAI/GPT-OSS.html#gpt-oss-vllm-usage-guide

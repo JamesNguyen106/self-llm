@@ -1,24 +1,23 @@
-# 04-gpt-oss-20b Lora微调以及Swanlab可视化
+# 04-gpt-oss-20b LoRA Fine-tuning and SwanLab Visualization
 
-## 引言
+## Introduction
 
-> 看完本教程你将收获：
+> After reading this tutorial, you will learn:
 > 	
-> - Lora微调gpt-oss-20b！
+> - LoRA fine-tuning of gpt-oss-20b!
 >
-> - 利用ms-swift进行Lora微调gpt-oss-20b！	
+> - Use ms-swift for LoRA fine-tuning of gpt-oss-20b!	
 
+### Data Preparation
 
-### 数据准备
-
-> 下载多语言推理数据集
+> Download multilingual reasoning dataset
 
 ```Python
 from datasets import load_dataset
 dataset = load_dataset("HuggingFaceH4/Multilingual-Thinking", split="train")
 ```
 
-### 数据可视化
+### Data Visualization
 
 ```Python
 User:
@@ -37,24 +36,24 @@ Assistant response:
     Melbourne. Canberra está ubicada en el Territorio de la Capital Australiana (ACT), en el este de Australia.
 ```
 
-### 环境配置
+### Environment Configuration
 
 ```Python
 pip install torch --index-url https://download.pytorch.org/whl/cu128
 pip install "peft>=0.17.0" "transformers>=4.55.0" trackio
 ```
 
-### 微调
+### Fine-tuning
 
-> 加载tokenizer
+> Load tokenizer
 
 ```Python
 from transformers import AutoTokenizer
 
-tokenizer = AutoTokenizer.from_pretrained("openai/gpt-oss-20b") #替换成你下载的目录哦～
+tokenizer = AutoTokenizer.from_pretrained("openai/gpt-oss-20b") # Replace with your downloaded directory~
 ```
 
-> 然后我们可以使用tokenizer的 `apply_chat_template（）` 方法来格式化消息：
+> Then we can use the tokenizer's `apply_chat_template()` method to format the message:
 
 ```Python
 messages = dataset[0]["messages"]
@@ -62,9 +61,9 @@ conversation = tokenizer.apply_chat_template(messages, tokenize=False)
 print(conversation)
 ```
 
-> 为了准备模型进行训练，让我们首先从 [Hugging Face Hub](https://huggingface.co/)下载权重。
+> To prepare the model for training, let's first download the weights from [Hugging Face Hub](https://huggingface.co/).
 > 
-> 我们将使用 Transformers 中的 🤗 `AutoModelForCausalLM` 类来加载模型
+> We will use the 🤗 `AutoModelForCausalLM` class in Transformers to load the model
 
 ```Python
 import torch
@@ -82,11 +81,11 @@ model_kwargs = dict(
 model = AutoModelForCausalLM.from_pretrained("openai/gpt-oss-20b", **model_kwargs)
 ```
 
-这将为模型加载训练所需的配置。`attn_implementation` 设置为渴望更好的性能，`use_cache` 设置为 `False`，因为我们将使用梯度检查点微调模型。
+This will load the configuration required for training the model. `attn_implementation` is set to eager for better performance, and `use_cache` is set to `False` because we will use gradient checkpointing to fine-tune the model.
 
-如果您熟悉 Transformers，您可能会注意到我们正在使用 `Mxfp4Config` 进行量化。这是 OpenAI 模型的特定配置，允许我们使用混合精度训练，其中包含一种称为 ++[MXFP4](https://en.wikipedia.org/wiki/Block_floating_point)++ 的特殊 4 位浮点格式，该格式针对 AI 工作负载进行了优化。
+If you are familiar with Transformers, you might notice that we are using `Mxfp4Config` for quantization. This is a specific configuration for OpenAI models that allows us to use mixed precision training, which includes a special 4-bit floating point format called ++[MXFP4](https://en.wikipedia.org/wiki/Block_floating_point)++ optimized for AI workloads.
 
-> 测试一条message
+> Test a message
 
 ```Python
 messages = [
@@ -104,7 +103,7 @@ response = tokenizer.batch_decode(output_ids)[0]
 print(response)
 ```
 
-> 配置 LoRA 参数
+> Configure LoRA parameters
 
 ```Python
 from peft import LoraConfig, get_peft_model
@@ -114,7 +113,7 @@ peft_config = LoraConfig(
     lora_alpha=16,
     target_modules="all-linear",
     target_parameters=[
-        # MoE 专家层的投影，按需增减
+        # MoE expert layer projections, add or remove as needed
         "7.mlp.experts.gate_up_proj",
         "7.mlp.experts.down_proj",
         "15.mlp.experts.gate_up_proj",
@@ -127,7 +126,7 @@ peft_model = get_peft_model(model, peft_config)
 peft_model.print_trainable_parameters()
 ```
 
-注意：`openai/gpt-oss-20b` 模型是一种++[混合专家 （MoE）](https://huggingface.co/blog/moe)++ 架构。除了针对注意力层（`target_modules=“all-linear”）` 之外，在专家模块中包含投影层也很重要。PEFT 通过 `target_parameters` 参数促进了这一点，它允许您指定特定于专家的层，例如 `mlp.experts.down_proj` 和 `mlp.experts.gate_up_proj`。
+Note: The `openai/gpt-oss-20b` model is a ++[Mixture of Experts (MoE)](https://huggingface.co/blog/moe)++ architecture. In addition to targeting attention layers (`target_modules="all-linear"`), it is important to include projection layers in expert modules. PEFT facilitates this via the `target_parameters` argument, which allows you to specify expert-specific layers such as `mlp.experts.down_proj` and `mlp.experts.gate_up_proj`.
 
 ```Python
 from datasets import DatasetDict
@@ -135,13 +134,13 @@ from datasets import DatasetDict
 max_length = 4096
 
 def format_and_tokenize(example):
-    # 期望存在 "messages" 字段（和你示例一致）
+    # Expect "messages" field to exist (consistent with your example)
     messages = example["messages"]
-    # 不加 generation_prompt；让模型学习到完整的对话展开
+    # Do not add generation_prompt; let the model learn the complete conversation unfolding
     text = tokenizer.apply_chat_template(
         messages, tokenize=False
     )
-    # 直接整体 tokenization，labels=inputs（由 collator 处理）
+    # Tokenize directly as a whole, labels=inputs (handled by collator)
     tokens = tokenizer(
         text,
         truncation=True,
@@ -151,13 +150,13 @@ def format_and_tokenize(example):
     return tokens
 
 tokenized = ds.map(format_and_tokenize, remove_columns=ds.column_names)
-# 简单划个验证集（可选）
+# Simply split a validation set (optional)
 splits = tokenized.train_test_split(test_size=0.01, seed=42)
 train_ds, eval_ds = splits["train"], splits["test"]
 
 ```
 
-> 微调参数设置
+> Fine-tuning parameter settings
 
 ```Python
 from dataclasses import dataclass
@@ -169,7 +168,7 @@ class CausalDataCollator:
     tokenizer: AutoTokenizer
     mlm: bool = False
     def __call__(self, features):
-        # default_data_collator 会把 input_ids/attention_mask 转成张量
+        # default_data_collator will convert input_ids/attention_mask to tensors
         batch = default_data_collator(features)
         if "labels" not in batch:
             batch["labels"] = batch["input_ids"].clone()
@@ -206,27 +205,27 @@ trainer = Trainer(
 trainer.train()
 
 ```
-> 训练过程上传到Swanlab
-> 训练过程通过swanlab可视化
+> Upload training process to SwanLab
+> Visualize training process via SwanLab
 
 ![](./images/4-0.png)
 
-### Swanlab
+### SwanLab
 
 ![](./images/4-1.png)
 
-> [SwanLab](https://github.com/swanhubx/swanlab) 是一个开源的模型训练记录工具，面向 AI 研究者，提供了训练可视化、自动日志记录、超参数记录、实验对比、多人协同等功能。在 `SwanLab` 上，研究者能基于直观的可视化图表发现训练问题，对比多个实验找到研究灵感，并通过在线链接的分享与基于组织的多人协同训练，打破团队沟通的壁垒。
+> [SwanLab](https://github.com/swanhubx/swanlab) is an open-source model training recording tool for AI researchers, providing training visualization, automatic logging, hyperparameter recording, experiment comparison, multi-person collaboration, and other functions. On `SwanLab`, researchers can discover training problems based on intuitive visualization charts, compare multiple experiments to find research inspiration, and break down team communication barriers through online link sharing and organization-based multi-person collaborative training.
 
-#### 为什么要记录训练？
+#### Why record training?
 
-相较于软件开发，模型训练更像一个实验科学。一个品质优秀的模型背后，往往是成千上万次实验。研究者需要不断尝试、记录、对比，积累经验，才能找到最佳的模型结构、超参数与数据配比。在这之中，如何高效进行记录与对比，对于研究效率的提升至关重要。
+Compared to software development, model training is more like an experimental science. Behind a high-quality model are often thousands of experiments. Researchers need to constantly try, record, compare, and accumulate experience to find the best model structure, hyperparameters, and data ratio. In this process, how to efficiently record and compare is crucial for improving research efficiency.
 
-#### 在哪里用？
+#### Where to use?
 
-建议先在 [SwanLab 官网](https://swanlab.cn/) 注册账号，然后在SFT初始化阶段选择
+It is recommended to register an account on the [SwanLab official website](https://swanlab.cn/) first, and then select it during the SFT initialization phase.
 
 
-> 设置成你自己的api_key~
+> Set to your own api_key~
 ```Python
 from transformers import TrainerCallback
 
@@ -246,21 +245,21 @@ except Exception as e:
     print("SwanLab disabled:", e)
 ```
 
-> 权重合并
+> Merge weights
 ```Python
 from peft import PeftModel
 
-# 先载入基座
+# Load base model first
 infer_kwargs = dict(attn_implementation="eager", torch_dtype="auto", use_cache=True, device_map="auto")
 base_model = AutoModelForCausalLM.from_pretrained(model_id, **infer_kwargs).cuda()
 
-# 把 LoRA 适配器加载回来（用训练输出目录）
+# Load LoRA adapter back (use training output directory)
 peft_model = PeftModel.from_pretrained(base_model, "gpt-oss-20b-multilingual-reasoner")
-# 合并并卸载LoRA
+# Merge and unload LoRA
 merged = peft_model.merge_and_unload()
 merged.eval()
 
-# 生成
+# Generate
 messages = [
     {"role": "system", "content": "reasoning language: German"},
     {"role": "user", "content": "¿Cuál es el capital de Australia?"},
@@ -275,29 +274,29 @@ print(tokenizer.batch_decode(gen)[0])
 ![](./images/4-5.png)
 
 
-## ms-swift微调
+## ms-swift Fine-tuning
 
-> 这里给大家提供一种框架微调教程 基于`ms-swift`
-> 微调的框架有很多，不论是选择哪一方都是殊途同归，为什么选择ms-swift见：
+> Here is a framework fine-tuning tutorial based on `ms-swift`
+> There are many fine-tuning frameworks, and whichever one you choose leads to the same goal. Why choose ms-swift, see:
 
-- 🍎 模型类型：支持450+纯文本大模型、150+多模态大模型以及All-to-All全模态模型、序列分类模型、Embedding模型训练到部署全流程。
-数据集类型：内置150+预训练、微调、人类对齐、多模态等各种类型的数据集，并支持自定义数据集。
-硬件支持：CPU、RTX系列、T4/V100、A10/A100/H100、Ascend NPU、MPS等。
-- 🍊 轻量训练：支持了LoRA、QLoRA、DoRA、LoRA+、ReFT、RS-LoRA、LLaMAPro、Adapter、GaLore、Q-Galore、LISA、UnSloth、Liger-Kernel等轻量微调方式。
-分布式训练：支持分布式数据并行（DDP）、device\_map简易模型并行、DeepSpeed ZeRO2 ZeRO3、FSDP等分布式训练技术。
-量化训练：支持对BNB、AWQ、GPTQ、AQLM、HQQ、EETQ量化模型进行训练。
-RLHF训练：支持纯文本大模型和多模态大模型的DPO、GRPO、RM、PPO、KTO、CPO、SimPO、ORPO等人类对齐训练方法。
-- 🍓 多模态训练：支持对图像、视频和语音不同模态模型进行训练，支持VQA、Caption、OCR、Grounding任务的训练。
-界面训练：以界面的方式提供训练、推理、评测、量化的能力，完成大模型的全链路。
-插件化与拓展：支持自定义模型和数据集拓展，支持对loss、metric、trainer、loss-scale、callback、optimizer等组件进行自定义。
-- 🍉 工具箱能力：不仅提供大模型和多模态大模型的训练支持，还涵盖其推理、评测、量化和部署全流程。
-推理加速：支持PyTorch、vLLM、LmDeploy推理加速引擎，并提供OpenAI接口，为推理、部署和评测模块提供加速。
-模型评测：以EvalScope作为评测后端，支持100+评测数据集对纯文本和多模态模型进行评测。
-模型量化：支持AWQ、GPTQ和BNB的量化导出，导出的模型支持使用vLLM/LmDeploy推理加速，并支持继续训练。
+- 🍎 Model Type: Supports 450+ pure text large models, 150+ multimodal large models, and All-to-All full modal models, sequence classification models, Embedding model training to deployment full process.
+Dataset Type: Built-in 150+ pre-training, fine-tuning, human alignment, multimodal and other types of datasets, and supports custom datasets.
+Hardware Support: CPU, RTX series, T4/V100, A10/A100/H100, Ascend NPU, MPS, etc.
+- 🍊 Lightweight Training: Supports LoRA, QLoRA, DoRA, LoRA+, ReFT, RS-LoRA, LLaMAPro, Adapter, GaLore, Q-Galore, LISA, UnSloth, Liger-Kernel and other lightweight fine-tuning methods.
+Distributed Training: Supports distributed data parallel (DDP), device\_map simple model parallel, DeepSpeed ZeRO2 ZeRO3, FSDP and other distributed training technologies.
+Quantization Training: Supports training of BNB, AWQ, GPTQ, AQLM, HQQ, EETQ quantized models.
+RLHF Training: Supports human alignment training methods such as DPO, GRPO, RM, PPO, KTO, CPO, SimPO, ORPO for pure text large models and multimodal large models.
+- 🍓 Multimodal Training: Supports training of different modal models of image, video and voice, supports training of VQA, Caption, OCR, Grounding tasks.
+Interface Training: Provides training, inference, evaluation, and quantization capabilities in an interface way, completing the full link of large models.
+Pluginization and Extension: Supports custom model and dataset extension, supports customization of components such as loss, metric, trainer, loss-scale, callback, optimizer, etc.
+- 🍉 Toolbox Capabilities: Not only provides training support for large models and multimodal large models, but also covers their inference, evaluation, quantization and deployment full processes.
+Inference Acceleration: Supports PyTorch, vLLM, LmDeploy inference acceleration engines, and provides OpenAI interface to provide acceleration for inference, deployment and evaluation modules.
+Model Evaluation: Uses EvalScope as the evaluation backend, supports 100+ evaluation datasets to evaluate pure text and multimodal models.
+Model Quantization: Supports quantization export of AWQ, GPTQ and BNB, exported models support using vLLM/LmDeploy inference acceleration, and support continued training.
 
-### 环境配置
+### Environment Configuration
 
-1. 基础环境配置
+1. Basic Environment Configuration
 	
 
 > PyTorch 2.6.0
@@ -308,7 +307,7 @@ RLHF训练：支持纯文本大模型和多模态大模型的DPO、GRPO、RM、P
 > 
 > GPU NVIDIA H20-96GB \* 4
 
-2. Lora环境配置
+2. LoRA Environment Configuration
 	
 
 ```Bash
@@ -318,15 +317,15 @@ pip install swanlab
 pip install -U transformers kernels torch
 ```
 
-### 数据准备
+### Data Preparation
 
-> 构建数据集
+> Build Dataset
 > 
-> 参考[自定义数据集 — swift 3.8.0.dev0 文档](https://swift.readthedocs.io/zh-cn/latest/Customization/%E8%87%AA%E5%AE%9A%E4%B9%89%E6%95%B0%E6%8D%AE%E9%9B%86.html)获得更多定义方式
+> Refer to [Custom Dataset — swift 3.8.0.dev0 Documentation](https://swift.readthedocs.io/zh-cn/latest/Customization/%E8%87%AA%E5%AE%9A%E4%B9%89%E6%95%B0%E6%8D%AE%E9%9B%86.html) for more definition methods
 > 
-> 这里使用最简单，与官方结构一致的方式
+> Here uses the simplest way consistent with the official structure
 > 
-> 我这里是翻译任务，所以我的示例数据如下：
+> Mine is a translation task, so my example data is as follows:
 
 ```Bash
   {
@@ -343,61 +342,61 @@ pip install -U transformers kernels torch
   },
 ```
 
-> 或者你可以使用开源的任意数据集
+> Or you can use any open source dataset
 > 
-> 这里，其他同学找了一个魔搭上开源的赛博猫娘数据集来进行这次教程，试想哪一个佬不想拥有一个赛博猫娘呢？
+> Here, other students found an open source Cyber Catgirl dataset on ModelScope for this tutorial. Imagine which guy doesn't want to have a Cyber Catgirl?
 
-数据集传送门：[沐雪猫娘化数据集](https://modelscope.cn/datasets/himzhzx/muice-dataset-train.catgirl/files)
+Dataset Portal: [Muxue Catgirl Dataset](https://modelscope.cn/datasets/himzhzx/muice-dataset-train.catgirl/files)
 
 ```JSON
 {
-  "instruction": "沐雪的功能是什么？",
+  "instruction": "What is Muxue's function?",
   "input": "",
-  "output": "喵~本雪的主要功能是让你开心喵！用可爱的猫娘之力治愈你的心灵，喵呜~"
+  "output": "Meow~ Benxue's main function is to make you happy meow! Heal your soul with the power of cute catgirl, meow~"
   "history":[]
 }
 ```
 
-### Lora微调
+### LoRA Fine-tuning
 
-> 编写bash脚本
+> Write bash script
 
 ```Bash
-MASTER_PORT=$PORT \                             # 分布式训练主进程的通信端口，使用环境变量 $PORT
-NPROC_PER_NODE=4 \                              # 每个节点的进程数（通常等于 GPU 数）
-CUDA_VISIBLE_DEVICES=0,1,2,3 \                  # 指定使用的 GPU 编号
-swift sft --deepspeed zero3\                    # 使用 swift 的 sft 训练命令，并启用 DeepSpeed ZeRO-3 优化
-    --model /root/autodl-tmp/gpt-oss-20b \      # 模型路径（替换为你自己的模型目录）
-    --dataset /root/autodl-tmp/train.json \     # 数据集路径（替换为你自己的训练数据）
-    --train_type lora \                         # 训练类型为 LoRA（低秩适配）
-    --torch_dtype bfloat16 \                    # 计算精度设为 bfloat16
-    --num_train_epochs 35 \                     # 训练总轮数
-    --per_device_train_batch_size 1 \           # 每个设备的训练批大小
-    --per_device_eval_batch_size 1 \            # 每个设备的验证批大小
-    --learning_rate 1e-4 \                      # 学习率
-    --lora_rank 8 \                             # LoRA 的秩（低秩分解维度）
-    --lora_alpha 32 \                           # LoRA 缩放因子
-    --target_modules all-linear \               # 应用 LoRA 的目标模块类型
-    --gradient_accumulation_steps 16 \          # 梯度累积步数
-    --eval_steps 50 \                           # 每 50 步进行一次评估
-    --save_steps 50 \                           # 每 50 步保存一次模型
-    --save_total_limit 2 \                      # 最多保留 2 个最新的检查点
-    --logging_steps 5 \                         # 每 5 步记录一次日志
-    --max_length 8192 \                         # 最大序列长度
-    --output_dir output \                       # 模型输出目录
-    --warmup_ratio 0.05 \                       # 学习率预热比例
-    --dataloader_num_workers 4 \                # DataLoader 工作线程数
-    --use_liger_kernel true \                   # 启用 liger kernel 优化
-    --load_from_cache_file false \              # 是否从缓存文件加载数据
-    --loss_scale ignore_empty_think \           # 忽略空 think 标签的 loss
-    --save_strategy epoch\                      # 保存策略：每个 epoch 保存一次
-    --model_author gxb \                        # 模型作者名
-    --model_name gxb-gpt-oss-20b-agent-distill \# 模型名称
-    --report_to swanlab \                       # 训练日志上报到 SwanLab
-    --swanlab_project swift-robot               # SwanLab 项目名称
+MASTER_PORT=$PORT \                             # Communication port for distributed training main process, use environment variable $PORT
+NPROC_PER_NODE=4 \                              # Number of processes per node (usually equal to number of GPUs)
+CUDA_VISIBLE_DEVICES=0,1,2,3 \                  # Specify GPU numbers to use
+swift sft --deepspeed zero3\                    # Use swift's sft training command and enable DeepSpeed ZeRO-3 optimization
+    --model /root/autodl-tmp/gpt-oss-20b \      # Model path (replace with your own model directory)
+    --dataset /root/autodl-tmp/train.json \     # Dataset path (replace with your own training data)
+    --train_type lora \                         # Training type is LoRA (Low-Rank Adaptation)
+    --torch_dtype bfloat16 \                    # Calculation precision set to bfloat16
+    --num_train_epochs 35 \                     # Total training epochs
+    --per_device_train_batch_size 1 \           # Training batch size per device
+    --per_device_eval_batch_size 1 \            # Validation batch size per device
+    --learning_rate 1e-4 \                      # Learning rate
+    --lora_rank 8 \                             # LoRA rank (low-rank decomposition dimension)
+    --lora_alpha 32 \                           # LoRA scaling factor
+    --target_modules all-linear \               # Target module types to apply LoRA
+    --gradient_accumulation_steps 16 \          # Gradient accumulation steps
+    --eval_steps 50 \                           # Evaluate every 50 steps
+    --save_steps 50 \                           # Save model every 50 steps
+    --save_total_limit 2 \                      # Keep at most 2 latest checkpoints
+    --logging_steps 5 \                         # Log every 5 steps
+    --max_length 8192 \                         # Maximum sequence length
+    --output_dir output \                       # Model output directory
+    --warmup_ratio 0.05 \                       # Learning rate warmup ratio
+    --dataloader_num_workers 4 \                # DataLoader worker threads
+    --use_liger_kernel true \                   # Enable liger kernel optimization
+    --load_from_cache_file false \              # Whether to load data from cache file
+    --loss_scale ignore_empty_think \           # Ignore loss of empty think tags
+    --save_strategy epoch\                      # Save strategy: save once per epoch
+    --model_author gxb \                        # Model author name
+    --model_name gxb-gpt-oss-20b-agent-distill \# Model name
+    --report_to swanlab \                       # Report training logs to SwanLab
+    --swanlab_project swift-robot               # SwanLab project name
 ```
 
-### 测试效果
+### Test Effect
 
 ```Bash
 CUDA_VISIBLE_DEVICES=0 \
@@ -410,7 +409,7 @@ swift infer \
 
 ![](./images/4-2.png)
 
-### 合并权重
+### Merge Weights
 
 ```Bash
 swift export \
@@ -420,9 +419,9 @@ swift export \
 
 ![](./images/4-3.png)
 
-### 推理
+### Inference
 
-> 编写推理脚本
+> Write inference script
 
 ```Bash
 CUDA_VISIBLE_DEVICES=0 \

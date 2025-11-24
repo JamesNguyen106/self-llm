@@ -1,10 +1,10 @@
-# 01-GLM-4.1V-Thinking vLLM部署调用
+# 01-GLM-4.1V-Thinking vLLM Deployment and Usage
 
-[GLM-4.1V-Thinking](https://github.com/THUDM/GLM-4.1V-Thinking) 是一由智谱 AI 基于 [GLM-4-9B-0414](https://github.com/THUDM/GLM-4) 基座模型推出的新版VLM开源模型，引入思考范式，通过课程采样强化学习 RLCS（Reinforcement Learning with Curriculum Sampling）全面提升模型能力， 达到 10B 参数级别的视觉语言模型的最强性能。
+[GLM-4.1V-Thinking](https://github.com/THUDM/GLM-4.1V-Thinking) is a new version of the VLM open-source model launched by Zhipu AI based on the [GLM-4-9B-0414](https://github.com/THUDM/GLM-4) base model. It introduces a thinking paradigm and comprehensively improves model capabilities through Reinforcement Learning with Curriculum Sampling (RLCS), achieving the strongest performance among visual language models at the 10B parameter level.
 
-## 环境准备
+## Environment Preparation
 
-本文的试验基础环境如下：
+The basic experimental environment for this article is as follows:
 
 ```
 ----------------
@@ -15,14 +15,14 @@ GPU  A800-80GB(80GB) * 1
 ----------------
 ```
 
-1. 克隆GLM4.1V项目仓库
+1. Clone the GLM4.1V project repository
 
 ```bash
 git clone https://github.com/THUDM/GLM-4.1V-Thinking.git
 cd GLM-4.1V-Thinking
 ```
 
-1. `pip`换源加速，下载并安装依赖包
+2. Change `pip` source for acceleration, download and install dependency packages
 
 ```bash
 python -m pip install --upgrade pip
@@ -32,22 +32,22 @@ pip install modelscope
 pip install -r GLM-4.1V-Thinking/requirements.txt
 ```
 
-关键依赖项包括：
+Key dependencies include:
 
 - torch>=2.7.1
 - gradio>=5.35.0
 - PyMuPDF>=1.26.1
-- av>=14.4.0（用于视频处理）
+- av>=14.4.0 (for video processing)
 - accelerate>=1.6.0
-- 从GitHub获取的最新transformers和vLLM
+- Latest transformers and vLLM from GitHub
 
-## 模型下载
+## Model Download
 
-模型可以从Hugging Face和ModelScope仓库获取。可以显式下载，也可以在首次使用时执行仓库代码自动下载。
+Models can be obtained from Hugging Face and ModelScope repositories. You can download them explicitly or execute repository code to download automatically upon first use.
 
 ### ModelScope
 
-新建 .py/.ipynb 文件，复制下述代码并执行：使用 modelscope 中的 snapshot_download 函数下载模型，第一个参数为模型名称，参数 cache_dir 为模型自定义下载路径。
+Create a new .py/.ipynb file, copy the following code and execute it: Use the `snapshot_download` function in modelscope to download the model. The first parameter is the model name, and the parameter `cache_dir` is the custom model download path.
 
 ```python
 from modelscope import snapshot_download
@@ -60,11 +60,11 @@ model_dir = snapshot_download('Qwen/Qwen3-8B', cache_dir='/root/autodl-tmp', rev
 huggingface-cli download THUDM/GLM-4.1V-9B-Thinking --local-dir /root/autodl-tmp/GLM-4.1V-9B-Thinking
 ```
 
-ps：记得修改对应的 `cache_dir` / `local_dir`为你的模型下载路径哦~
+ps: Remember to modify the corresponding `cache_dir` / `local_dir` to your model download path~
 
-## transformers调用代码
+## Transformers Usage Code
 
-使用`transformers`库作为推理的改写交互脚本进行调用测试
+Use the `transformers` library as a rewriting interaction script for inference testing.
 
 ```python
 import argparse
@@ -92,7 +92,7 @@ messages.append(
         "role": "user",
         "content": [
             {"type": "video", "url": "/root/autodl-tmp/media/demo3.mp4"},
-            {"type": "text", "text": "这个视频的内容是什么？"},
+            {"type": "text", "text": "What is the content of this video?"},
         ],
     }
 )
@@ -124,29 +124,29 @@ messages.append(
 print(f"Assistant: {raw}")
 ```
 
-使用的视频文件示例：
+Example video file used:
 
 [vdieo-1.mp4](images/vdieo-1.mp4)
 
-执行代码结果如下：
+Code execution result is as follows:
 
 ![image-2.png](images/image-2.png)
 
 ```
-Assistant: <think>用户现在需要描述视频内容。首先看画面：主要是Logi品牌的键盘，有手在操作按键。要分解每个细节：键盘是黑色带银色上沿，有数字键、功能键（如ins、delete、home等），手部动作是点击不同按键（比如数字键、功能键），背景有桌面、耳机（白色耳机和黑色耳机线），还有其他物品。需要按时间顺序或场景描述，说明是手在键盘上操作，按键的交互，以及环境元素。
+Assistant: <think>The user now needs to describe the video content. First look at the screen: mainly a Logi brand keyboard, with hands operating the keys. Break down every detail: the keyboard is black with a silver upper edge, has number keys, function keys (such as ins, delete, home, etc.), hand movements are clicking different keys (such as number keys, function keys), background has a desktop, headphones (white headphones and black headphone cord), and other items. Need to describe in chronological order or scene, explaining that the hand is operating on the keyboard, the interaction of the keys, and the environmental elements.
 
-首先，视频展示了一个人在操作Logi品牌的键盘。画面中可以看到黑色的键盘，带有银色的上边缘，键盘上有数字按键（0-9等）、功能按键（如ins、delete、home、end、page up/down等）。有一只手在键盘上点击不同的按键，比如先点击数字键“2”，然后“8”等，展示按键操作。背景中可以看到桌面，上面有白色的耳机、黑色的耳机线等物品，营造出办公或桌面场景的氛围。整体是近距离展示键盘操作，重点在按键交互和键盘外观。
+First, the video shows a person operating a Logi brand keyboard. In the picture, you can see a black keyboard with a silver upper edge, and the keyboard has number keys (0-9, etc.) and function keys (such as ins, delete, home, end, page up/down, etc.). A hand clicks different keys on the keyboard, such as first clicking the number key "2", then "8", etc., showing key operations. In the background, you can see a desktop with white headphones, black headphone cords, and other items, creating an office or desktop scene atmosphere. The overall is a close-up display of keyboard operation, focusing on key interaction and keyboard appearance.
 
-现在组织语言：视频展示了一只手在Logi品牌的黑色键盘上操作，键盘带有银色上边缘，包含数字键、功能键（如ins、delete、home、end、page up/down等）。手部依次点击不同的按键，背景可见桌面、白色耳机和黑色耳机线等物品，呈现出桌面操作键盘的场景，重点展现键盘按键的交互与键盘外观细节。</think><answer>视频展示了在桌面环境中，一只手在Logi品牌的黑色键盘上操作。该键盘带有银色上边缘，包含数字键（0 - 9）、功能键（如“ins”“delete”“home”“end”“page up/down”等）。手部依次点击不同的按键（如数字键、功能键），背景中可见桌面、白色耳机和黑色耳机线等物品，呈现出近距离操作键盘的场景，重点展现键盘按键的交互与键盘外观细节。
+Now organize the language: The video shows a hand operating on a Logi brand black keyboard, which has a silver upper edge and contains number keys and function keys (such as ins, delete, home, end, page up/down, etc.). The hand clicks different keys in turn, and the background shows the desktop, white headphones, and black headphone cords, presenting a scene of operating the keyboard on the desktop, focusing on the interaction of keyboard keys and keyboard appearance details.</think><answer>The video shows a hand operating on a Logi brand black keyboard in a desktop environment. The keyboard has a silver upper edge and contains number keys (0 - 9) and function keys (such as "ins", "delete", "home", "end", "page up/down", etc.). The hand clicks different keys (such as number keys, function keys) in turn. In the background, items such as a desktop, white headphones, and black headphone cords are visible, presenting a close-up scene of operating the keyboard, focusing on the interaction of keyboard keys and keyboard appearance details.
 ```
 
-## vLLM调用代码准备
+## vLLM Usage Code Preparation
 
-首先从 `vLLM` 库中导入 `LLM` 和 `SamplingParams` 类。`LLM` 类是使用 `vLLM` 引擎运行离线推理的主要类。`SamplingParams` 类指定采样过程的参数，用于控制和调整生成文本的随机性和多样性。
+First, import the `LLM` and `SamplingParams` classes from the `vLLM` library. The `LLM` class is the main class for running offline inference using the `vLLM` engine. The `SamplingParams` class specifies the parameters of the sampling process, used to control and adjust the randomness and diversity of the generated text.
 
-`vLLM` 提供了非常方便的封装，我们直接传入模型名称或模型路径即可，不必手动初始化模型和分词器。
+`vLLM` provides a very convenient wrapper. We can directly pass in the model name or model path without manually initializing the model and tokenizer.
 
-在 `/root/autodl-tmp` 路径下新建 `vllm_model.py` 文件并在其中输入以下内容
+Create a new `vllm_model.py` file in the `/root/autodl-tmp` path and enter the following content:
 
 ```python
 # vllm_model.py
@@ -156,29 +156,29 @@ import os
 import json
 
 def prepare_model(model_path, max_tokens=512, temperature=0.8, top_p=0.95, max_model_len=2048):
-    # 初始化 vLLM 推理引擎
+    # Initialize vLLM inference engine
     llm = LLM(model=model_path, tokenizer=model_path, max_model_len=max_model_len,trust_remote_code=True)
     return llm
 
 def get_completion(prompts, llm, max_tokens=512, temperature=0.8, top_p=0.95, max_model_len=2048):
     stop_token_ids = [151329, 151336, 151338]
-    # 创建采样参数。temperature 控制生成文本的多样性，top_p 控制核心采样的概率
+    # Create sampling parameters. temperature controls the diversity of generated text, top_p controls the probability of nucleus sampling
     sampling_params = SamplingParams(temperature=temperature, top_p=top_p, max_tokens=max_tokens, stop_token_ids=stop_token_ids)
-    # 初始化 vLLM 推理引擎
+    # Initialize vLLM inference engine
     outputs = llm.generate(prompts, sampling_params)
     return outputs
 
-# 初始化 vLLM 推理引擎
+# Initialize vLLM inference engine
 model_path = '/root/autodl-tmp/ZhipuAI/GLM-4.1V-9B-Thinking'
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 llm = prepare_model(model_path)
 
-prompt = "5的阶乘是多少？"
+prompt = "What is the factorial of 5?"
 messages = [
     {"role": "user", "content": prompt}
 ]
 
-# 应用template中的chat模板
+# Apply chat template from template
 text = tokenizer.apply_chat_template(
     messages,
     tokenize=False,
@@ -189,32 +189,32 @@ outputs = get_completion(text, llm, max_tokens=1024, temperature=1, top_p=1, max
 print(outputs[0].outputs[0].text)
 ```
 
-执行代码结果如下：
+Code execution result is as follows:
 
 ![image-3.png](images/image-3.png)
 
-GLM-4.1V-9B-Thinking支持多种类型的多模态输入，但有特定限制：
+GLM-4.1V-9B-Thinking supports multiple types of multimodal inputs, but with specific limitations:
 
-| **输入类型** | **最大允许数量** | **格式支持** |
+| **Input Type** | **Maximum Allowed Quantity** | **Format Support** |
 | --- | --- | --- |
-| 图片 | 10张图片（Gradio），300（API） | JPG, JPEG, PNG, GIF, BMP, TIFF, WEBP |
-| 视频 | 1个视频 | MP4, AVI, MKV, MOV, WMV, FLV, WEBM, MPEG, M4V |
-| 文档 | 1个PDF或1个PPT | PDF, PPT, PPTX（内部转换为图片） |
+| Image | 10 images (Gradio), 300 (API) | JPG, JPEG, PNG, GIF, BMP, TIFF, WEBP |
+| Video | 1 video | MP4, AVI, MKV, MOV, WMV, FLV, WEBM, MPEG, M4V |
+| Document | 1 PDF or 1 PPT | PDF, PPT, PPTX (internally converted to images) |
 
-## 创建兼容 OpenAI API 接口的服务器
+## Create OpenAI API Compatible Server
 
-`GLM-4.1V-Thinking` 兼容 `OpenAI API` 协议，所以我们可以直接使用 `vLLM` 创建 `OpenAI API` 服务器。`vLLM` 部署实现 `OpenAI API` 协议的服务器非常方便。默认会在 [http://localhost:8000](http://localhost:8000/) 启动服务器。服务器当前一次托管一个模型，并实现列表模型、`completions` 和 `chat completions` 端口。
+`GLM-4.1V-Thinking` is compatible with the `OpenAI API` protocol, so we can directly use `vLLM` to create an `OpenAI API` server. `vLLM` makes it very convenient to deploy a server that implements the `OpenAI API` protocol. By default, it will start the server at [http://localhost:8000](http://localhost:8000/). The server currently hosts one model at a time and implements list models, `completions`, and `chat completions` endpoints.
 
-- `completions`：是基本的文本生成任务，模型会在给定的提示后生成一段文本。这种类型的任务通常用于生成文章、故事、邮件等。
-- `chat completions`：是面向对话的任务，模型需要理解和生成对话。这种类型的任务通常用于构建聊天机器人或者对话系统。
+- `completions`: Basic text generation task, the model generates a piece of text after a given prompt. This type of task is usually used to generate articles, stories, emails, etc.
+- `chat completions`: Dialogue-oriented task, the model needs to understand and generate dialogue. This type of task is usually used to build chatbots or dialogue systems.
 
-在创建服务器时，我们可以指定模型名称、模型路径、聊天模板等参数。
+When creating a server, we can specify parameters such as model name, model path, chat template, etc.
 
-- `-host` 和 `-port` 参数指定地址。
-- `-model` 参数指定模型名称。
-- `-chat-template` 参数指定聊天模板。
-- `-served-model-name` 指定服务模型的名称。
-- `-max-model-len` 指定模型的最大长度。
+- `-host` and `-port` parameters specify the address.
+- `-model` parameter specifies the model name.
+- `-chat-template` parameter specifies the chat template.
+- `-served-model-name` specifies the name of the served model.
+- `-max-model-len` specifies the maximum length of the model.
 
 ```bash
 vllm serve /root/autodl-tmp/ZhipuAI/GLM-4.1V-9B-Thinking
@@ -226,13 +226,13 @@ vllm serve /root/autodl-tmp/ZhipuAI/GLM-4.1V-9B-Thinking
 
 ![image-4.png](images/image-4.png)
 
-- 通过 `curl` 命令查看当前的模型列表
+- View the current model list via `curl` command
 
 ```bash
 curl http://localhost:8000/v1/models
 ```
 
-得到的返回值如下所示
+The returned value is as follows
 
 ```json
 {
@@ -267,24 +267,24 @@ curl http://localhost:8000/v1/models
 }
 ```
 
-- 使用 `curl` 命令测试 `OpenAI Completions API`
+- Test `OpenAI Completions API` using `curl` command
 
 ```
 curl http://localhost:8000/v1/completions \
     -H "Content-Type: application/json" \
     -d '{
         "model": "GLM-4.1V-9B-Thinking",
-        "prompt": "456*123等于多少？<think>\n",
+        "prompt": "What is 456*123? <think>\n",
         "max_tokens": 1024,
         "temperature": 0
     }'
 ```
 
- 得到的返回值如下所示
+The returned value is as follows
 
 ![image-5.png](images/image-5.png)
 
-• 用 `Python` 脚本请求 `OpenAI Chat Completions API` 的单图像示例
+• Single image example using `Python` script to request `OpenAI Chat Completions API`
 
 ```bash
 # vllm_openai_completions.py
@@ -317,7 +317,7 @@ def create_content_item(media_path, media_type):
 
 client = OpenAI(
     base_url="http://localhost:8000/v1",
-    api_key="sk-xxx", # 随便填写，只是为了通过接口参数校验
+    api_key="sk-xxx", # Fill in arbitrarily, just to pass interface parameter validation
 )
 
 media_path = "/root/autodl-tmp/media/demo1.png"
@@ -327,7 +327,7 @@ messages = [
         "role": "user",
         "content": [
             create_content_item(media_path, media_type),
-            {"type": "text", "text": "这张图是什么"},
+            {"type": "text", "text": "What is this picture?"},
         ],
     }
 ]
@@ -347,19 +347,19 @@ print("=========Answer=========")
 print(response.choices[0].message.content.strip())
 ```
 
-示例使用的图像如下所示：
+The image used in the example is as follows:
 
 ![image-6.png](images/image-6.png)
 
-得到的结果如下所示：
+The result obtained is as follows:
 
 ![image-7.png](images/image-7.png)
 
-• 用 `Python` 脚本请求 `OpenAI Chat Completions API` 的多图像分析
+• Multi-image analysis using `Python` script to request `OpenAI Chat Completions API`
 
 ```python
 # vllm_openai_completions.py
-# 上述代码不变
+# The above code remains unchanged
 media_path_1 = "/root/autodl-tmp/media/demo2-1.JPG"
 media_path_2 = "/root/autodl-tmp/media/demo2-2.JPG"
 
@@ -369,35 +369,35 @@ messages = [
         "content": [
             create_content_item(media_path_1, media_type),
             create_content_item(media_path_2, media_type),
-            {"type": "text", "text": "这两张图像之间可能有哪些关联？"},
+            {"type": "text", "text": "What are the possible connections between these two images?"},
         ],
     }
 ]
 ```
 
-分别传入多张图像的路径进行解析，GLM-4.1V-Thinking 可同时分析多达 10 张图像
+Pass in the paths of multiple images separately for analysis. GLM-4.1V-Thinking can analyze up to 10 images simultaneously.
 
-示例使用的图像如下所示：
+The images used in the example are as follows:
 <div style="display: flex; justify-content: center; gap: 20px; margin: 20px 0;">
     <img src="images/image-8.jpg" alt="image-8" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
     <img src="images/image-9.jpg" alt="image-9" style="width: 300px; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
 </div>
 
-执行代码结果如下：
+Code execution result is as follows:
 
-Assistant: 根据提供的参考信息，这两张图片之间可能存在以下几种关联：
+Assistant: Based on the provided reference information, there may be the following connections between these two images:
 
-1. 健康生活方式关联
-第1张图片展示的是无糖可口可乐，强调"0糖 0脂肪 0卡路里"，表明产品定位为健康饮品选择
-第2张图片显示体重秤和体重记录(42.7公斤)，这直接与体重管理相关
-两者共同反映了现代人对健康饮食和体重管理的关注
-2. 时间与行为关联
-第2张图片中的日期"10/23"可能表示特定日期，与第1张图片的可口可乐消费相关
-可能是在10月23日，这个人选择了无糖可乐作为健康饮品，并记录了体重
-3. 心理动机关联
-第1张图片中的无糖可乐可能代表一种健康选择的替代品，减少糖分和卡路里摄入
-第2张图片中的"YOU'RE GONNA LOVE IT!"可能是在鼓励自己坚持健康的生活方式，包括选择无糖饮料
-4. 产品与消费者关联
-第1张图片是可口可乐的产品信息
-第2张图片可能是消费者使用无糖可乐后的记录或反馈，展示了产品的健康益处
-这些关联表明，这两张图片可能共同讲述了一个关于健康意识增强、注重体重管理的生活方式故事，其中无糖可乐作为健康饮食选择的一部分。
+1. Healthy Lifestyle Connection
+The first image shows sugar-free Coca-Cola, emphasizing "0 sugar 0 fat 0 calories", indicating that the product is positioned as a healthy drink choice.
+The second image shows a weighing scale and weight record (42.7 kg), which is directly related to weight management.
+Both reflect modern people's concern for healthy diet and weight management.
+2. Time and Behavior Connection
+The date "10/23" in the second image may represent a specific date, related to the Coca-Cola consumption in the first image.
+It may be that on October 23, this person chose sugar-free Coke as a healthy drink and recorded their weight.
+3. Psychological Motivation Connection
+The sugar-free Coke in the first image may represent a healthy alternative choice to reduce sugar and calorie intake.
+"YOU'RE GONNA LOVE IT!" in the second image may be encouraging oneself to stick to a healthy lifestyle, including choosing sugar-free drinks.
+4. Product and Consumer Connection
+The first image is product information of Coca-Cola.
+The second image may be a record or feedback from a consumer after using sugar-free Coke, showing the health benefits of the product.
+These connections indicate that these two images may tell a story about a lifestyle of enhanced health awareness and focus on weight management, where sugar-free Coke is part of a healthy diet choice.

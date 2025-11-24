@@ -1,28 +1,28 @@
-# 02-gpt-oss-20b EvalScope 评测
+# 02-gpt-oss-20b EvalScope Evaluation
 
-## 大模型评测是什么
+## What is Large Model Evaluation
 
-大语言模型评测是指对大语言模型（LLM）在多种任务和场景下的性能进行全面评估的过程。评测的目的是衡量模型的通用能力、特定领域表现、效率、鲁棒性、安全性等多方面性能，以便优化模型设计、指导技术选型和推动模型在实际应用中的部署。
-评测的主要内容包括以下几个方面：
+Large Language Model (LLM) evaluation refers to the process of comprehensively assessing the performance of LLMs in various tasks and scenarios. The purpose of evaluation is to measure the model's general capabilities, specific domain performance, efficiency, robustness, safety, and other aspects, in order to optimize model design, guide technology selection, and promote model deployment in practical applications.
+The main content of evaluation includes the following aspects:
 
-- 通用能力：评估模型在语言理解、生成、推理等方面的基础能力。
+- General Capabilities: Assess the model's basic capabilities in language understanding, generation, reasoning, etc.
 	
-- 特定领域表现：针对特定任务（如数学推理、代码生成、情感分析等）的性能评估。
+- Specific Domain Performance: Performance evaluation for specific tasks (such as mathematical reasoning, code generation, sentiment analysis, etc.).
 	
-- 效率与资源消耗：包括模型的训练和推理时间、计算资源需求等。
+- Efficiency and Resource Consumption: Including model training and inference time, computational resource requirements, etc.
 	
-- 鲁棒性与可靠性：评估模型在面对噪声、对抗攻击或输入扰动时的稳定性。
+- Robustness and Reliability: Assess the model's stability when facing noise, adversarial attacks, or input perturbations.
 	
-- 伦理与安全性：检测模型是否会产生有害内容、是否存在偏见或歧视。
+- Ethics and Safety: Detect whether the model generates harmful content, or has bias or discrimination.
 	
 
-EvalScope 是魔搭社区官方推出的模型评测与性能基准测试框架，内置多个常用测试基准和评测指标，如 MMLU、CMMLU、C-Eval、GSM8K、ARC、HellaSwag、TruthfulQA、MATH 和 HumanEval 等；支持多种类型的模型评测，包括 LLM、多模态 LLM、embedding 模型和 reranker 模型。EvalScope 还适用于多种评测场景，如端到端 RAG 评测、竞技场模式和模型推理性能压测等。此外，通过 ms-swift 训练框架的无缝集成，可一键发起评测，实现了模型训练到评测的全链路支持。 官网地址：[https://evalscope.readthedocs.io/zh-cn/latest/get\_started](https://evalscope.readthedocs.io/zh-cn/latest/get_started)
+EvalScope is the official model evaluation and performance benchmarking framework launched by the ModelScope community. It has built-in multiple common test benchmarks and evaluation metrics, such as MMLU, CMMLU, C-Eval, GSM8K, ARC, HellaSwag, TruthfulQA, MATH, and HumanEval, etc.; supports multiple types of model evaluation, including LLM, multimodal LLM, embedding model, and reranker model. EvalScope is also suitable for various evaluation scenarios, such as end-to-end RAG evaluation, arena mode, and model inference performance stress testing. In addition, through seamless integration with the ms-swift training framework, evaluation can be initiated with one click, realizing full-link support from model training to evaluation. Official website address: [https://evalscope.readthedocs.io/zh-cn/latest/get\_started](https://evalscope.readthedocs.io/zh-cn/latest/get_started)
 
-## EvalScope 评测使用方法
+## EvalScope Evaluation Usage Method
 
-> 为了更方便的使用模型，并提升推理速度，我们使用 vLLM 启动一个与 OpenAI 格式兼容的 Web 服务。
+> In order to use the model more conveniently and improve inference speed, we use vLLM to start a Web service compatible with OpenAI format.
 
-1. 创建并激活新的conda环境：
+1. Create and activate a new conda environment:
 	
 
 ```Bash
@@ -30,42 +30,42 @@ conda create -n gpt_oss_vllm python=3.12
 conda activate gpt_oss_vllm
 ```
 
-2. 安装相关依赖：
+2. Install related dependencies:
 	
 
 ```Bash
-# 安装 PyTorch-nightly 和 vLLM
+# Install PyTorch-nightly and vLLM
 pip install --pre vllm==0.10.1+gptoss \    
             --extra-index-url https://wheels.vllm.ai/gpt-oss/ \    
             --extra-index-url https://download.pytorch.org/whl/nightly/cu128
-# 安装 FlashInfer
+# Install FlashInfer
 pip install flashinfer-python==0.2.10
-# 安装 evalscope
+# Install evalscope
 pip install evalscope[perf] -U
 ```
 
-3. 启动模型服务
+3. Start model service
 	
 
-> 我们在 H20 GPU上成功启动gpt-oss-20b模型服务
+> We successfully started the gpt-oss-20b model service on H20 GPU
 
 ```Bash
 VLLM_ATTENTION_BACKEND=TRITON_ATTN_VLLM_V1 vllm serve openai/gpt-oss-20b --served-model-name gpt-oss-20b --trust_remote_code --port 8801
 ```
 
-## 推理速度测试
+## Inference Speed Test
 
-> 我们使用EvalScope的推理速度测试功能，来评测模型的推理速度。
+> We use EvalScope's inference speed test function to evaluate the model's inference speed.
 
-测试环境：
+Test Environment:
 
-- 显卡: H20-96GB \* 1
+- Graphics Card: H20-96GB \* 1
 	
-- vLLM版本: 0.10.1 + gptoss
+- vLLM Version: 0.10.1 + gptoss
 	
-- prompt 长度: 1024 tokens
+- Prompt Length: 1024 tokens
 	
-- 输出长度: 1024 tokens
+- Output Length: 1024 tokens
 	
 
 ```Bash
@@ -120,30 +120,30 @@ Performance Recommendations:
 • The system seems not to have reached its performance bottleneck, try higher concurrency
 ```
 
-## 基准测试
+## Benchmark Test
 
-> 我们使用 EvalScope 的基准测试功能，来评测模型的能力。
-> 这里我们以 AIME2025 这个数学推理基准测试为例，测试模型的能力。
+> We use EvalScope's benchmark test function to evaluate the model's capabilities.
+> Here we take the AIME2025 mathematical reasoning benchmark as an example to test the model's capabilities.
 
-运行测试脚本：
+Run test script:
 
 ```Python
 from evalscope.constants import EvalType
 from evalscope import TaskConfig, run_task
 task_cfg = TaskConfig(    
-    model='gpt-oss-20b',  # 模型名称    
-    api_url='http://127.0.0.1:8801/v1',  # 模型服务地址    
-    eval_type=EvalType.SERVICE, # 评测类型，这里使用服务评测    
-    datasets=['aime25'],  # 测试的数据集    
+    model='gpt-oss-20b',  # Model name    
+    api_url='http://127.0.0.1:8801/v1',  # Model service address    
+    eval_type=EvalType.SERVICE, # Evaluation type, here use service evaluation    
+    datasets=['aime25'],  # Dataset to test    
     generation_config={        
-    'extra_body': {"reasoning_effort": "high"}  # 模型生成参数，这里设置为高推理水平    
-    },    eval_batch_size=10, # 并发测试的batch size    
-    timeout=60000, # 超时时间，单位为秒
+    'extra_body': {"reasoning_effort": "high"}  # Model generation parameters, set to high reasoning level here    
+    },    eval_batch_size=10, # Batch size for concurrent testing    
+    timeout=60000, # Timeout in seconds
     )
 run_task(task_cfg=task_cfg)
 ```
 
-输出如下：这里测试结果为0.8，大家可以尝试不同的模型生成参数，多次测试，查看结果。
+Output as follows: The test result here is 0.8. You can try different model generation parameters, test multiple times, and check the results.
 
 ```Plain
 +-------------+-----------+---------------+-------------+-------+---------+---------+
@@ -157,7 +157,7 @@ run_task(task_cfg=task_cfg)
 +-------------+-----------+---------------+-------------+-------+---------+---------+ 
 ```
 
-## 并发测试
+## Concurrency Test
 
 ```Bash
 MODEL="gpt-oss-20b"
@@ -176,26 +176,26 @@ evalscope perf \
     --name "${MODEL}-number${NUMBER}-parallel${PARALLEL}"
 ```
 
-- `--url`：指定模型服务的 API 接口地址，这里是本地部署的 vLLM 服务地址。
+- `--url`: Specify the API interface address of the model service, here is the locally deployed vLLM service address.
 	
-- `--parallel`：指定并发请求的线程数，这里设置为 2 个线程。
+- `--parallel`: Specify the number of threads for concurrent requests, here set to 2 threads.
 	
-- `--model`：指定要评测的模型名称，这里是 **gpt-oss-20b**。
+- `--model`: Specify the name of the model to be evaluated, here is **gpt-oss-20b**.
 	
-- `--number`：指定每个线程要发送的请求数量，这里设置为 100 个请求。
+- `--number`: Specify the number of requests to be sent by each thread, here set to 100 requests.
 	
-- `--api`：指定评测使用的 API 类型，这里是 openai。
+- `--api`: Specify the API type used for evaluation, here is openai.
 	
-- `--dataset`：指定评测使用的数据集，这里是 openqa。
+- `--dataset`: Specify the dataset used for evaluation, here is openqa.
 	
-- `--stream`：指定是否使用流式输出，这里设置为 true。
+- `--stream`: Specify whether to use streaming output, here set to true.
 	
-- `--swanlab-api-key`：指定 swanlab 的 API 密钥，这里需要替换为实际的 API 密钥。
+- `--swanlab-api-key`: Specify the API key of swanlab, here needs to be replaced with the actual API key.
 	
-- `--name`：指定评测任务的名称，这里是 gpt-oss-20b-number100-parallel5。
+- `--name`: Specify the name of the evaluation task, here is gpt-oss-20b-number100-parallel5.
 	
 
-测试结果可以在我的实验结果 [perf\_benchmark](https://swanlab.cn/@twosugar/perf_benchmark/overview) 上查看，如下图所示：
+The test results can be viewed on my experimental results [perf\_benchmark](https://swanlab.cn/@twosugar/perf_benchmark/overview), as shown in the figure below:
 
 ```SQL
 Benchmarking summary:

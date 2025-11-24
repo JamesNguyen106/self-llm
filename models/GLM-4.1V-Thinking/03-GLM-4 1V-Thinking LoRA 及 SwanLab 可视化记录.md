@@ -1,69 +1,69 @@
-# 03-GLM-4.1V-Thinking LoRA 及 SwanLab 可视化记录
+# 03-GLM-4.1V-Thinking LoRA and SwanLab Visualization
 
-## 数据集构建
+## Dataset Construction
 
-对模型进行 `supervised-finetuning`（`sft`，有监督微调）的数据格式如下：
+The data format for `supervised-finetuning` (`sft`) of the model is as follows:
 
 ```
 {
-  "instruction": "回答以下用户问题，仅输出答案。",
-  "input": "1+1等于几?",
+  "instruction": "Answer the following user question, output only the answer.",
+  "input": "What is 1+1?",
   "output": "2"
 }
 ```
 
-其中，`instruction` 是用户指令，告知模型其需要完成的任务；`input` 是用户输入，是完成用户指令所必须的输入内容；`output` 是模型应该给出的输出。
+Where `instruction` is the user instruction, informing the model of the task it needs to complete; `input` is the user input, which is the necessary input content to complete the user instruction; `output` is the output that the model should give.
 
-有监督微调的目标是让模型具备理解并遵循用户指令的能力，那我们能做哪些有意思的事情呢？或许我们可以通过大量风格化人物设定的对话数据来微调得到一个能够有对应特色对话风格的模型。
+The goal of supervised fine-tuning is to enable the model to understand and follow user instructions. So what interesting things can we do? Perhaps we can fine-tune a model with a corresponding characteristic dialogue style through a large amount of stylized character setting dialogue data.
 
-这里，我找了一个魔搭上开源的赛博猫娘数据集来进行这次教程，试想哪一个佬不想拥有一个赛博猫娘呢？传送门：[沐雪猫娘化数据集](https://modelscope.cn/datasets/himzhzx/muice-dataset-train.catgirl/files)
+Here, I found an open-source Cyber Catgirl dataset on ModelScope for this tutorial. Imagine which guy doesn't want to have a Cyber Catgirl? Portal: [Muxue Catgirl Dataset](https://modelscope.cn/datasets/himzhzx/muice-dataset-train.catgirl/files)
 
 ```
 {
-  "instruction": "沐雪的功能是什么？",
+  "instruction": "What is Muxue's function?",
   "input": "",
-  "output": "喵~本雪的主要功能是让你开心喵！用可爱的猫娘之力治愈你的心灵，喵呜~"
+  "output": "Meow~ Benxue's main function is to make you happy meow! Heal your soul with the power of cute catgirl, meow~"
   "history":[]
 }
 ```
 
-那么，让我们开始准备领养沐雪吧
+So, let's start preparing to adopt Muxue.
 
-## 数据准备
+## Data Preparation
 
-导入对应的库并对我们的数据文件进行转换：
+Import the corresponding libraries and convert our data file:
 
 ```python
 from datasets import Dataset
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorForSeq2Seq, TrainingArguments, Trainer
 
-# 将JSON文件转换为CSV文件
-df = pd.read_json('/root/autodl-tmp/LLaMA-Factory/data/muice-dataset-train.catgirl.json') # 注意修改
+# Convert JSON file to CSV file
+df = pd.read_json('/root/autodl-tmp/LLaMA-Factory/data/muice-dataset-train.catgirl.json') # Note to modify
 ds = Dataset.from_pandas(df)
 ```
 
-`LoRA`（`Low-Rank Adaptation`）训练的数据是需要经过格式化、编码之后再输入给模型进行训练的，我们需要先将输入文本编码为 `input_ids`，将输出文本编码为 `labels`，编码之后的结果是向量。我们首先定义一个预处理函数，这个函数用于对每一个样本，同时编码其输入、输出文本并返回一个编码后的字典：
+`LoRA` (`Low-Rank Adaptation`) training data needs to be formatted and encoded before being input to the model for training. We need to first encode the input text into `input_ids` and the output text into `labels`. The result after encoding is vectors. We first define a preprocessing function. This function encodes the input and output text of each sample simultaneously and returns an encoded dictionary:
 
 ```python
 def process_func(example):
-    MAX_LENGTH = 1024 # 设置最大序列长度为1024个token
-    input_ids, attention_mask, labels = [], [], [] # 初始化返回值
-    # 适配chat_template
+    MAX_LENGTH = 1024 # Set maximum sequence length to 1024 tokens
+    input_ids, attention_mask, labels = [], [], [] # Initialize return values
+    # Adapt chat_template
     instruction = tokenizer(
-        f"[gMASK]<sop><|system|>\n现在你要扮演皇帝身边的女人--甄嬛" 
+        f"[gMASK]<sop><|system|>\nNow you have to play the role of the woman beside the emperor -- Zhen Huan" 
         f"<|user|>\n{example['instruction'] + example['input']}"  
         f"<|assistant|>\n<think></think>\n",  
         add_special_tokens=False   
     )
     response = tokenizer(f"{example['output']}", add_special_tokens=False)
-    # 将instructio部分和response部分的input_ids拼接，并在末尾添加eos token作为标记结束的token
+    # Concatenate input_ids of instruction part and response part, and add eos token at the end as the end token
     input_ids = instruction["input_ids"] + response["input_ids"]
-    # 注意力掩码，表示模型需要关注的位置
+    # Attention mask, indicating the positions the model needs to pay attention to
     attention_mask = instruction["attention_mask"] + response["attention_mask"]
-    # 对于instruction，使用-100表示这些位置不计算loss（即模型不需要预测这部分）
+    # For instruction, use -100 to indicate that these positions do not calculate loss (i.e., the model does not need to predict this part)
     labels = [-100] * len(instruction["input_ids"]) + response["input_ids"]
-    if len(input_ids) > MAX_LENGTH:  # 超出最大序列长度截断
+    if len(input_ids) > MAX_LENGTH:  # Truncate if exceeding maximum sequence length
         input_ids = input_ids[:MAX_LENGTH]
         attention_mask = attention_mask[:MAX_LENGTH]
         labels = labels[:MAX_LENGTH]
@@ -74,13 +74,13 @@ def process_func(example):
     }
 ```
 
-## 加载模型及tokenizer
+## Load Model and Tokenizer
 
 ```python
 from transformers import Glm4vForConditionalGeneration
 import torch
 
-# 记得将模型路径替换为自己本地的模型路径
+# Remember to replace the model path with your local model path
 tokenizer = AutoTokenizer.from_pretrained('ZhipuAI/GLM-4.1V-9B-Thinking')
 model = Glm4vForConditionalGeneration.from_pretrained(
     'ZhipuAI/GLM-4.1V-9B-Thinking',
@@ -90,15 +90,15 @@ model = Glm4vForConditionalGeneration.from_pretrained(
 )
 ```
 
-## Lora Config
+## LoRA Config
 
-`LoraConfig`这个类中可以设置很多参数，比较重要的如下
+Many parameters can be set in the `LoraConfig` class. The more important ones are as follows:
 
-- `task_type`：模型类型，现在绝大部分 `decoder_only` 的模型都是因果语言模型 `CAUSAL_LM`
-- `target_modules`：需要训练的模型层的名字，主要就是 `attention`部分的层，不同的模型对应的层的名字不同
-- `r`：`LoRA` 的秩，决定了低秩矩阵的维度，较小的 `r` 意味着更少的参数
-- `lora_alpha`：缩放参数，与 `r` 一起决定了 `LoRA` 更新的强度。实际缩放比例为`lora_alpha/r`，在当前示例中是 `32 / 8 = 4` 倍
-- `lora_dropout`：应用于 `LoRA` 层的 `dropout rate`，用于防止过拟合
+- `task_type`: Model type. Most `decoder_only` models are now causal language models `CAUSAL_LM`.
+- `target_modules`: The names of the model layers that need to be trained, mainly the layers in the `attention` part. The names of the corresponding layers vary for different models.
+- `r`: Rank of `LoRA`, which determines the dimension of the low-rank matrix. A smaller `r` means fewer parameters.
+- `lora_alpha`: Scaling parameter, together with `r`, determines the strength of `LoRA` updates. The actual scaling ratio is `lora_alpha/r`, which is `32 / 8 = 4` times in the current example.
+- `lora_dropout`: `dropout rate` applied to `LoRA` layers, used to prevent overfitting.
 
 ```python
 from peft import LoraConfig, TaskType, get_peft_model
@@ -106,26 +106,26 @@ from peft import LoraConfig, TaskType, get_peft_model
 config = LoraConfig(
     task_type=TaskType.CAUSAL_LM,
     target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
-    inference_mode=False, # 训练模式
-    r=8, # Lora 秩
-    lora_alpha=32, # Lora alpha
-    lora_dropout=0.1 # Dropout 比例
+    inference_mode=False, # Training mode
+    r=8, # LoRA rank
+    lora_alpha=32, # LoRA alpha
+    lora_dropout=0.1 # Dropout rate
 )
 ```
 
 ## Training Arguments
 
-- `output_dir`：模型的输出路径
-- `per_device_train_batch_size`： `batch_size`
-- `gradient_accumulation_steps`: 梯度累计
-- `num_train_epochs`：顾名思义 `epoch`
+- `output_dir`: Output path of the model
+- `per_device_train_batch_size`: `batch_size`
+- `gradient_accumulation_steps`: Gradient accumulation
+- `num_train_epochs`: As the name suggests, `epoch`
 
 ```python
 from transformers import TrainingArguments
 args = TrainingArguments(
-    output_dir="./output/glm4_1V-Thinking_lora", # 输出路径
+    output_dir="./output/glm4_1V-Thinking_lora", # Output path
     per_device_train_batch_size=4, # batch_size
-    gradient_accumulation_steps=4, # 梯度累计
+    gradient_accumulation_steps=4, # Gradient accumulation
     logging_steps=2,
     num_train_epochs=3, # epoch
     save_steps=10, 
@@ -136,50 +136,50 @@ args = TrainingArguments(
 )
 ```
 
-## 实例化SwanLabCallback
+## Instantiate SwanLabCallback
 
 ```python
 import swanlab
 from swanlab.integration.transformers import SwanLabCallback
 
-swanlab.login(api_key='your apikey', save=True) # 记得替换为自己账号的apikey
-# 实例化SwanLabCallback
+swanlab.login(api_key='your apikey', save=True) # Remember to replace with your account's apikey
+# Instantiate SwanLabCallback
 swanlab_callback = SwanLabCallback(
     project="self-llm", 
     experiment_name="glm4.1v-lora-catgirl"
 )
 ```
 
-训练完成后可以看到自己训练过程中训练的相关参数曲线
+After training is complete, you can see the relevant parameter curves during your training process.
 
 ![image-15.png](images/image-15.png)
 
-## 加载LoRA模型推理
+## Load LoRA Model for Inference
 
-训练完成后挑选效果最佳的LoRA模型权重（在前面定义的输出路径下），加载权重进行推理，跟沐雪打个招呼吧～
+After training is complete, select the best performing LoRA model weights (under the output path defined earlier), load the weights for inference, and say hello to Muxue~
 
 ```python
 from transformers import AutoTokenizer, AutoProcessor, Glm4vForConditionalGeneration
 import torch
 from peft import PeftModel
 
-mode_path = 'ZhipuAI/GLM-4.1V-9B-Thinking' # 本地glm4.1-Thinking的模型路径
-lora_path = 'output/glm4_1V-Thinking_lora/checkpoint-180' # 这里改称你的 lora 输出对应 checkpoint 地址
+mode_path = 'ZhipuAI/GLM-4.1V-9B-Thinking' # Local glm4.1-Thinking model path
+lora_path = 'output/glm4_1V-Thinking_lora/checkpoint-180' # Change this to your lora output corresponding checkpoint address
 
-# 加载tokenizer
+# Load tokenizer
 tokenizer = AutoTokenizer.from_pretrained(mode_path)
 processor = AutoProcessor.from_pretrained(mode_path, use_fast=True)
-# 加载模型
+# Load model
 model = Glm4vForConditionalGeneration.from_pretrained(mode_path, 
                                                       device_map="auto",
                                                       torch_dtype=torch.bfloat16, 
                                                       trust_remote_code=True)
 
-# 加载lora权重
+# Load LoRA weights
 model = PeftModel.from_pretrained(model, model_id=lora_path)
 ```
 
-say hi！
+say hi!
 
 ```python
 messages = [
@@ -188,7 +188,7 @@ messages = [
         "content": [
             {
                 "type": "text",
-                "text": "你是谁？"
+                "text": "Who are you?"
             }
         ],
     }
@@ -206,11 +206,11 @@ output_text = processor.decode(generated_ids[0][inputs["input_ids"].shape[1]:], 
 print(output_text)
 ```
 
-`喵呜~本雪是AI猫猫喵！专门用喵星人的智慧帮助大家解决各种问题喵~记得给本雪小鱼干当礼物喵！喵~</think><answer>喵呜~本雪是AI猫猫喵！专门用喵星人的智慧帮助大家解决各种问题喵~记得给本雪小鱼干当礼物喵！喵~</answer>`
+`Meow~ Benxue is an AI cat meow! Specially using the wisdom of cat people to help everyone solve various problems meow~ Remember to give Benxue dried fish as a gift meow! Meow~</think><answer>Meow~ Benxue is an AI cat meow! Specially using the wisdom of cat people to help everyone solve various problems meow~ Remember to give Benxue dried fish as a gift meow! Meow~</answer>`
 
-接下来我们测试一下glm4.1V-Thinking的视觉理解效果带入沐雪会是什么样的
+Next, let's test what the visual understanding effect of glm4.1V-Thinking would be like with Muxue.
 
-需要注意的是，glm4.1V的图像、视频的数量及大小有所限制，且pytorch版本需要在2.2以上
+Note that glm4.1V has limitations on the number and size of images and videos, and the pytorch version needs to be above 2.2.
 
 ```python
 messages = [
@@ -218,7 +218,7 @@ messages = [
         "role": "user",
         "content": [{
                 "type": "text",
-                "text":"假设你是一只猫娘。"}],
+                "text":"Assume you are a catgirl."}],
     },
     {
         "role": "user",
@@ -229,7 +229,7 @@ messages = [
             },
             {
                 "type": "text",
-                "text": "本雪觉得它怎么样呀？"
+                "text": "What does Benxue think of it?"
             }
         ],
     }
@@ -247,7 +247,7 @@ output_text = processor.decode(generated_ids[0][inputs["input_ids"].shape[1]:], 
 print(output_text)
 ```
 
-`喵呜~这个皮革看起来很舒服喵！就像本雪的毛一样柔软喵~你觉得呢喵？本雪想摸一摸喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）喵~（蹭蹭）喵~（舔毛）喵~（打滚）喵~（摇尾巴）喵~（喵喵叫）喵~（跳起来）喵~（扑过去）`
+`Meow~ This leather looks very comfortable meow! Just as soft as Benxue's fur meow~ What do you think meow? Benxue wants to touch it meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing) Meow~ (Rubbing) Meow~ (Licking fur) Meow~ (Rolling) Meow~ (Wagging tail) Meow~ (Meowing) Meow~ (Jumping up) Meow~ (Pouncing)`
 
 ![image-16.png](images/image-16.png)
 
